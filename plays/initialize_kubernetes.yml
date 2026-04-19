@@ -1,0 +1,56 @@
+- name: Initialize kubernetes on control plane
+  hosts: control1
+  become: true
+  vars:
+    pod_network_cidr: "192.168.0.0/16"
+    user: "ubuntu"
+
+  tasks:
+    - name: Check if kubernetes already is initialized
+      ansible.builtin.stat:
+        path: /etc/kubernetes/admin.conf
+      register: kube_init_check
+
+    - name: run kubeadm init
+      ansible.builtin.shell: >
+        kubeadm init
+        --control-plane-endpoint "{{ ansible_host }}:6443"
+        --upload-certs
+        --pod-network-cidr={{ pod_network_cidr }}
+      when: not kube_init_check.stat.exists
+      register: kubeadm_output
+
+    - name: Create .kube folder for the user
+      ansible.builtin.file:
+        path: "/home/{{ user }}/.kube"
+        state: directory
+        mode: '0755'
+        owner: "{{ user }}"
+        group: "{{ user }}"
+
+    - name: Copy admin.conf to user's .kube/config
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: "/home/{{ user }}/.kube/config"
+        remote_src: yes
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        mode: '0600'
+
+    - name: Show kubeadm init output
+      ansible.builtin.debug:
+        var: kubeadm_output.stout_lines
+      when: kubeadm_output.stout is defined
+
+    - name: Generer join-kommando for workers
+      ansible.builtin.shell: kubeadm token create --print-join-command
+      register: worker_join_raw
+
+    - name: Generer ny certificate-key for andre controllere
+      ansible.builtin.shell: kubeadm init phase upload-certs --upload-certs | tail -n 1
+      register: cert_key_raw
+
+    - name: Lagre verdier som facts
+      ansible.builtin.set_fact:
+        worker_join: "{{ worker_join_raw.stdout }}"
+        control_plane_join: "{{ worker_join_raw.stdout }} --control-plane --certificate-key {{ cert_key_raw.stdout }}"
