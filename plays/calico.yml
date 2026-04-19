@@ -1,0 +1,24 @@
+---
+- name: Install Calico 
+  hosts: control1
+  tasks:
+    - name: Install Tigera Operator
+      kubernetes.core.k8s:
+        src: https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/tigera-operator.yaml
+        state: present
+
+    - name: Wait for Tiger Oeprator to start
+      ansible.builtin.pause:
+        seconds: 30
+
+    - name: Create Calico Custom Resources
+      kubernetes.core.k8s:
+        src: https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/custom-resources.yaml
+        state: present
+
+    - name: Wait on nodene to change to ready
+      ansible.builtin.shell: kubectl get nodes
+      register: node_status
+      until: "' Ready' in node_status.stdout"
+      retries: 10
+      delay: 15

@@ -3,3 +3,4 @@
 - import_playbook: plays/kubernetes_config.yml
 - import_playbook: plays/initialize_kubernetes.yml
 - import_playbook: plays/join.yml
+- import_playbook: plays/calico.yml

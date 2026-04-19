@@ -1,4 +1,4 @@
-- name: Init terraform on through gitlab
+- name: Provisioning through openstack
   hosts: localhost
   connection: local
   become: false

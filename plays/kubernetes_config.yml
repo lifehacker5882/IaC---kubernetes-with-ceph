@@ -103,3 +103,21 @@
       service:
         name: containerd
         state: restarted
+
+- name: Install necessary packages for control1 for Kubernetes
+  hosts: control1
+  become: true
+  tasks:
+    - name: Install pip
+      ansible.builtin.apt:
+        name:
+          - curl
+          - apt-transport-https
+          - python3-pip
+        state: present
+        update_cache: yes
+
+    - name: Install kubernetes python-library
+      ansible.builtin.apt:
+        name: python3-kubernetes
+        state: present
