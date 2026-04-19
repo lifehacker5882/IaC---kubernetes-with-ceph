@@ -1,0 +1,48 @@
+---
+- name: Get tokens from main controller plane
+  hosts: control1
+  become: true
+  tasks:
+    - name: Make a join command
+      ansible.builtin.shell: kubeadm token create --print-join-command
+      register: worker_join_cmd
+
+    - name: Make a cert-key for other controllers
+      ansible.builtin.shell: kubeadm init phase upload-certs --upload-certs | tail -n 1
+      register: cert_key
+
+    - name: Share information with other nodes
+      ansible.builtin.set_fact:
+        worker_join: "{{ worker_join_cmd.stdout }}"
+        control_join: "{{ worker_join_cmd.stdout }} --control-plane --certificate-key {{ cert_key.stdout }}"
+      delegate_to: "{{ item }}"
+      delegate_facts: true
+      loop: "{{ groups['all'] }}"
+
+- name: Join extra control nodes
+  hosts: "control*" #pattern matching all controls
+  become: true
+  tasks:
+    - name: Check if k8s exists
+      ansible.builtin.stat:
+        path: /etc/kubernetes/admin.conf
+      register: k8s_check
+
+    - name: Join as controller
+      ansible.builtin.shell: "{{ hostvars['control1']['control_join'] }}"
+      when:
+        - inventory_hostname != 'control1'
+        - not k8s_check.stat.exists
+
+- name: Join extra worker nodes
+  hosts: "worker*"
+  become: true
+  tasks:
+    - name: Check if k8s exists
+      ansible.builtin.stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: worker_check
+
+    - name: Join as worker
+      ansible.builtin.shell: "{{ hostvars['control1']['worker_join'] }}"
+      when: not worker_check.stat.exists
