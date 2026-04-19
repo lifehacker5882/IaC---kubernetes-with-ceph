@@ -1,0 +1,3 @@
+- import_playbook: plays/terraform.yml
+- import_playbook: plays/wait.yml
+- import_playbook: plays/main.yml

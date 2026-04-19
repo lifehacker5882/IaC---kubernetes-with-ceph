@@ -1,0 +1,45 @@
+- name: Init terraform on through gitlab
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+
+  vars:
+    base_dir: "{{ playbook_dir }}/.."
+    tf_dir: "terraform"
+    tf_data_dir: "/tmp/terraform-data"
+
+  tasks:
+    - name: Terraform init
+      ansible.builtin.shell:
+        cmd: terraform init
+        chdir: "{{ base_dir }}/{{ tf_dir }}"
+      environment:
+        TF_DATA_DIR: "{{ tf_data_dir }}"
+
+    - name: Terraform apply
+      ansible.builtin.shell:
+        cmd: terraform apply -auto-approve
+        chdir: "{{ base_dir }}/{{ tf_dir }}"
+      environment:
+        TF_DATA_DIR: "{{ tf_data_dir }}"
+
+    - name: Terraform outputs
+      command: terraform output -json
+      args:
+        chdir: "{{ base_dir }}/{{ tf_dir }}"
+      environment:
+        TF_DATA_DIR: "{{ tf_data_dir }}"
+      register: tf_output
+      changed_when: false
+
+    - name: Add VMs dynamically
+      add_host:
+        name: "{{ item.key }}"
+        ansible_host: "{{ item.value }}"
+        ansible_user: ubuntu
+        ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+        groups: "all_vms"
+        my_ip: "{{ item.value }}"
+      loop: "{{ (tf_output.stdout | from_json).vm_map.value | dict2items }}"
