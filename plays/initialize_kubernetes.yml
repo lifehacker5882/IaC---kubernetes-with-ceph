@@ -39,8 +39,8 @@
 
     - name: Show kubeadm init output
       ansible.builtin.debug:
-        var: kubeadm_output.stout_lines
-      when: kubeadm_output.stout is defined
+        var: kubeadm_output.stdout_lines
+      when: kubeadm_output.stdout is defined
 
     - name: Generer join-kommando for workers
       ansible.builtin.shell: kubeadm token create --print-join-command

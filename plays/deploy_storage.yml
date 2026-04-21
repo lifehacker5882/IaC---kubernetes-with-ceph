@@ -5,36 +5,24 @@
     manifest_source_dir: "/home/ubuntu/project2/rook-manifests"
 
   tasks:
-    - name: Make temp folder for files
-      ansible.builtin.file:
-        path: /tmp/rook_manifests
-        state: directory
+    - name: Add Rook repo
+      shell: helm repo add rook-release https://charts.rook.io/release
 
-    - name: Transfer yml files from master to control1
-      ansible.builtin.copy:
-        src: "{{ manifest_source_dir}}/{{item }}"
-        dest: "/tmp/rook_manifests/{{ item}}"
-      loop:
-        - crds.yaml
-        - common.yaml
-        - operator.yaml
-        - cluster-test.yaml
+    - name: Update Helm repos
+      shell: helm repo update
 
-    - name: Install CRDs
-      ansible.builtin.command: kubectl apply -f /tmp/rook_manifests/crds.yaml
-      ignore_errors: true
+    - name: Create namespace
+      shell: kubectl create namespace rook-ceph || true
 
-    - name: Install Common
-      ansible.builtin.command: kubectl apply -f /tmp/rook_manifests/common.yaml
-      ignore_errors: true
+    - name: Install Rook Ceph Operator
+      shell: |
+        helm upgrade --install rook-ceph rook-release/rook-ceph \
+        -n rook-ceph --create-namespace
 
-    - name: Install operator
-      ansible.builtin.command: kubectl apply -f /tmp/rook_manifests/operator.yaml
-
-    - name: Install cluster
-      ansible.builtin.command: kubectl apply -f /tmp/rook_manifests/cluster-test.yaml
-
-    - name: Cleanup
-      ansible.builtin.file:
-        path: /tmp/rook_manifests
-        state: absent
+    - name: Install Rook Ceph Cluster
+      shell: |
+        helm upgrade --install rook-ceph-cluster rook-release/rook-ceph-cluster \
+        -n rook-ceph --create-namespace \
+        --set cephClusterSpec.cephVersion.image=quay.io/ceph/ceph:v18 \
+        --set cephClusterSpec.storage.useAllNodes=true \
+        --set cephClusterSpec.storage.useAllDevices=true

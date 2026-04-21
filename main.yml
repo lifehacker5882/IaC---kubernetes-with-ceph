@@ -5,4 +5,6 @@
 - import_playbook: plays/worker.yml
 - import_playbook: plays/join.yml
 - import_playbook: plays/calico.yml
+- import_playbook: plays/wait_cluster_ready.yml
+- import_playbook: plays/docker_login.yml
 - import_playbook: plays/deploy_storage.yml

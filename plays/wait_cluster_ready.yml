@@ -1,0 +1,28 @@
+---
+- name: Wait for Kubernetes cluster to be ready
+  hosts: control1
+  become: false
+
+      tasks:
+    - name: Wait for all nodes Ready (strict)
+      shell: kubectl get nodes
+      register: nodes
+      retries: 30
+      delay: 10
+      until: nodes.stdout_lines | select('search', 'NotReady') | list | length == 0
+
+    - name: Wait for Calico pods to be running
+      shell: kubectl get pods -n calico-system
+      register: calico
+      until: >
+        'calico' in calico.stdout and
+        'Running' in calico.stdout
+      retries: 30
+      delay: 10
+
+    - name: Wait for CoreDNS
+      shell: kubectl get pods -n kube-system
+      register: dns
+      until: "'coredns' in dns.stdout and 'Running' in dns.stdout"
+      retries: 30
+      delay: 10

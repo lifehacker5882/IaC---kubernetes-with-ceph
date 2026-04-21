@@ -104,10 +104,24 @@
         name: containerd
         state: restarted
 
+    - name: Enable containerd
+      systemd:
+        name: containerd
+        enabled: true
+        state: started
+
 - name: Install necessary packages for control1 for Kubernetes
   hosts: control1
   become: true
   tasks:
+    - name: Install Helm
+      shell: |
+        curl https://get.helm.sh/helm-v3.14.4-linux-amd64.tar.gz -o helm.tar.gz
+        tar -xvf helm.tar.gz
+        mv linux-amd64/helm /usr/local/bin/helm
+      args:
+        creates: /usr/local/bin/helm
+
     - name: Install pip
       ansible.builtin.apt:
         name:
