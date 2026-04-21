@@ -1,0 +1,40 @@
+---
+- name: Deploy rook-ceph on k8s
+  hosts: control1
+  vars:
+    manifest_source_dir: "/home/ubuntu/project2/rook-manifests"
+
+  tasks:
+    - name: Make temp folder for files
+      ansible.builtin.file:
+        path: /tmp/rook_manifests
+        state: directory
+
+    - name: Transfer yml files from master to control1
+      ansible.builtin.copy:
+        src: "{{ manifest_source_dir}}/{{item }}"
+        dest: "/tmp/rook_manifests/{{ item}}"
+      loop:
+        - crds.yaml
+        - common.yaml
+        - operator.yaml
+        - cluster-test.yaml
+
+    - name: Install CRDs
+      ansible.builtin.command: kubectl apply -f /tmp/rook_manifests/crds.yaml
+      ignore_errors: true
+
+    - name: Install Common
+      ansible.builtin.command: kubectl apply -f /tmp/rook_manifests/common.yaml
+      ignore_errors: true
+
+    - name: Install operator
+      ansible.builtin.command: kubectl apply -f /tmp/rook_manifests/operator.yaml
+
+    - name: Install cluster
+      ansible.builtin.command: kubectl apply -f /tmp/rook_manifests/cluster-test.yaml
+
+    - name: Cleanup
+      ansible.builtin.file:
+        path: /tmp/rook_manifests
+        state: absent

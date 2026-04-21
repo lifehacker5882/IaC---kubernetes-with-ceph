@@ -1,5 +1,5 @@
 ---
-- name: Install Calico 
+- name: Install Calico
   hosts: control1
   tasks:
     - name: Install Tigera Operator

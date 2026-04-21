@@ -1,0 +1,17 @@
+---
+- name: Ready workers for ceph
+  hosts: "worker*"
+  become: true
+  tasks:
+    - name: Install lvm2
+      ansible.builtin.apt:
+        name: lvm2
+        state: present
+        update_cache: yes
+
+    - name: Wipe disks
+      ansible.builtin.command: "wipefs -a /dev/{{item}}"
+      loop:
+        - sdb
+        - sdc
+      ignore_errors: true
