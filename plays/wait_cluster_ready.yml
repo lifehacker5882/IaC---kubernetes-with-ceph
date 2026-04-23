@@ -3,7 +3,7 @@
   hosts: control1
   become: false
 
-  tasks:
+      tasks:
     - name: Wait for all nodes Ready (strict)
       shell: kubectl get nodes
       register: nodes
