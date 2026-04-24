@@ -17,6 +17,9 @@ spec:
     allowMultiplePerNode: false
   network:
     hostNetwork: true
+    # hostNetwork er satt til true for å unngå MTU- og rutingproblemer i Calico/pod-nettverket.
+    # Dette lar Ceph-monitorene binde seg direkte til nodenes fysiske IP-adresser (10.196.x.x).
+    # Ved re-installasjon må /var/lib/rook slettes på alle noder for å unngå IP-konflikter.
   storage:
     useAllNodes: true
     useAllDevices: true
