@@ -1,6 +1,6 @@
 ---
 - name: Get tokens from main controller plane
-  hosts: control1
+  hosts: node1
   become: true
   tasks:
     - name: Make a join command
@@ -19,8 +19,8 @@
       delegate_facts: true
       loop: "{{ groups['all'] }}"
 
-- name: Join extra control nodes
-  hosts: "control*" #pattern matching all controls
+- name: Join extra stacked nodes as control-plane
+  hosts: "node*"
   become: true
   tasks:
     - name: Check if k8s exists
@@ -29,20 +29,48 @@
       register: k8s_check
 
     - name: Join as controller
-      ansible.builtin.shell: "{{ hostvars['control1']['control_join'] }}"
+      ansible.builtin.shell: "{{ hostvars['node1']['control_join'] }}"
       when:
-        - inventory_hostname != 'control1'
+        - inventory_hostname != 'node1'
         - not k8s_check.stat.exists
 
-- name: Join extra worker nodes
-  hosts: "worker*"
+- name: Allow scheduling on all stacked nodes
+  hosts: node1
   become: true
   tasks:
-    - name: Check if k8s exists
-      ansible.builtin.stat:
-        path: /etc/kubernetes/kubelet.conf
-      register: worker_check
+    - name: Remove control-plane taint from all nodes
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - taint
+          - nodes
+          - --all
+          - node-role.kubernetes.io/control-plane-
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: untaint_result
+      retries: 10
+      delay: 6
+      changed_when: "'untainted' in untaint_result.stdout"
+      failed_when: untaint_result.rc != 0 and 'not found' not in untaint_result.stderr
+      until: untaint_result.rc == 0 or 'not found' in untaint_result.stderr
 
-    - name: Join as worker
-      ansible.builtin.shell: "{{ hostvars['control1']['worker_join'] }}"
-      when: not worker_check.stat.exists
+    - name: Verify control-plane taint is gone
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - get
+          - nodes
+          - -o
+          - jsonpath={range .items[*]}{.metadata.name}{" "}{.spec.taints}{"\n"}{end}
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: taint_state
+      changed_when: false
+
+    - name: Assert no node has control-plane taint
+      ansible.builtin.assert:
+        that:
+          - "'node-role.kubernetes.io/control-plane' not in taint_state.stdout"
+        fail_msg: "Control-plane taint still present on one or more nodes: {{ taint_state.stdout }}"
+        success_msg: "All nodes are schedulable for stacked setup."

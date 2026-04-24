@@ -1,0 +1,56 @@
+# Values for rook-release/rook-ceph-cluster in the main (non-kubespray) flow
+operatorNamespace: rook-ceph
+
+cephClusterSpec:
+  cephVersion:
+    image: quay.io/ceph/ceph:v19.2.3
+    allowUnsupported: false
+
+  dataDirHostPath: /var/lib/rook
+
+  mon:
+    count: 3
+    allowMultiplePerNode: false
+
+  dashboard:
+    enabled: true
+
+  network: {}
+
+  storage:
+    useAllNodes: false
+    useAllDevices: false
+    nodes:
+      - name: node1
+        devices:
+          - name: sdb
+          - name: sdc
+      - name: node2
+        devices:
+          - name: sdb
+          - name: sdc
+      - name: node3
+        devices:
+          - name: sdb
+          - name: sdc
+
+cephBlockPools:
+  - name: replicapool
+    spec:
+      failureDomain: host
+      replicated:
+        size: 3
+    storageClass:
+      enabled: true
+      name: rook-ceph-block
+      isDefault: false
+      reclaimPolicy: Delete
+      allowVolumeExpansion: true
+      volumeBindingMode: Immediate
+      parameters:
+        imageFormat: "2"
+        imageFeatures: layering
+        csi.storage.k8s.io/fstype: ext4
+
+cephFileSystems: []
+cephObjectStores: []

@@ -1,6 +1,6 @@
 variable "instance_names" {
 	type		= list(string)
-	default		= ["control1", "control2", "control3", "worker1", "worker2", "worker3"]
+	default		= ["node1", "node2", "node3"]
 }
 
 variable "ssh_public_key" {

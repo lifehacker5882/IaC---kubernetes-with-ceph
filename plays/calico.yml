@@ -1,6 +1,6 @@
 ---
 - name: Install Calico
-  hosts: control1
+  hosts: node1
   tasks:
     - name: Install Tigera Operator
       kubernetes.core.k8s:

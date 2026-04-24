@@ -1,10 +1,22 @@
 ---
 - name: Deploy rook-ceph on k8s
-  hosts: control1
+  hosts: node1
   vars:
-    manifest_source_dir: "/home/ubuntu/project2/rook-manifests"
+    rook_operator_values_src: "{{ playbook_dir }}/../rook-manifests/rook-ceph-values.yaml"
+    rook_cluster_values_src: "{{ playbook_dir }}/../rook-manifests/rook-ceph-cluster-values.yaml"
+    rook_operator_values_file: "/tmp/rook-ceph-values.yaml"
+    rook_cluster_values_file: "/tmp/rook-ceph-cluster-values.yaml"
 
   tasks:
+    - name: Ensure stacked nodes are schedulable before Rook deploy
+      become: true
+      ansible.builtin.command: kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: untaint_before_rook
+      changed_when: "'untainted' in untaint_before_rook.stdout"
+      failed_when: untaint_before_rook.rc != 0 and 'not found' not in untaint_before_rook.stderr
+
     - name: Add Rook repo
       shell: helm repo add rook-release https://charts.rook.io/release
 
@@ -14,15 +26,46 @@
     - name: Create namespace
       shell: kubectl create namespace rook-ceph || true
 
+    - name: Copy rook Helm values files to node1
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: "0644"
+      loop:
+        - {
+            src: "{{ rook_operator_values_src }}",
+            dest: "{{ rook_operator_values_file }}",
+          }
+        - {
+            src: "{{ rook_cluster_values_src }}",
+            dest: "{{ rook_cluster_values_file }}",
+          }
+
+    - name: Verify rook Helm values files exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ rook_operator_values_file }}"
+        - "{{ rook_cluster_values_file }}"
+      register: rook_values_files
+
+    - name: Fail if rook Helm values files are missing
+      ansible.builtin.assert:
+        that:
+          - rook_values_files.results | map(attribute='stat.exists') | min
+        fail_msg: "Missing Rook values file(s). Expected {{ rook_operator_values_file }} and {{ rook_cluster_values_file }}"
+
     - name: Install Rook Ceph Operator
       shell: |
         helm upgrade --install rook-ceph rook-release/rook-ceph \
-        -n rook-ceph --create-namespace
+        -n rook-ceph --create-namespace \
+        -f {{ rook_operator_values_file }}
+
+    - name: Wait for rook-ceph operator to be ready
+      shell: kubectl -n rook-ceph rollout status deploy/rook-ceph-operator --timeout=5m
 
     - name: Install Rook Ceph Cluster
       shell: |
         helm upgrade --install rook-ceph-cluster rook-release/rook-ceph-cluster \
         -n rook-ceph --create-namespace \
-        --set cephClusterSpec.cephVersion.image=quay.io/ceph/ceph:v19.2.0 \
-        --set cephClusterSpec.storage.useAllNodes=true \
-        --set cephClusterSpec.storage.useAllDevices=true
+        -f {{ rook_cluster_values_file }}

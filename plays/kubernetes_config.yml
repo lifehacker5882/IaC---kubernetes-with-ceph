@@ -35,9 +35,9 @@
         sysctl_file: /etc/sysctl.d/k8s.conf
         reload: yes
       loop:
-        - { key: 'net.bridge.bridge-nf-call-iptables', value: '1' }
-        - { key: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
-        - { key: 'net.ipv4.ip_forward', value: '1' }
+        - { key: "net.bridge.bridge-nf-call-iptables", value: "1" }
+        - { key: "net.bridge.bridge-nf-call-ip6tables", value: "1" }
+        - { key: "net.ipv4.ip_forward", value: "1" }
 
     - name: Install Containerd and tools
       apt:
@@ -64,15 +64,15 @@
     - name: Activate SystemCgroup in containerd config
       replace:
         path: /etc/containerd/config.toml
-        regexp: 'SystemdCgroup = false'
-        replace: 'SystemdCgroup = true'
+        regexp: "SystemdCgroup = false"
+        replace: "SystemdCgroup = true"
       notify: restart containerd
 
     - name: Download the Kuernetes GPT key
       get_url:
         url: https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key
         dest: /etc/apt/keyrings/kubernetes-apt-keyring.asc
-        mode: '0644'
+        mode: "0644"
 
     - name: Add Kubernetes apt-repo
       apt_repository:
@@ -110,8 +110,8 @@
         enabled: true
         state: started
 
-- name: Install necessary packages for control1 for Kubernetes
-  hosts: control1
+- name: Install necessary packages for node1 for Kubernetes
+  hosts: node1
   become: true
   tasks:
     - name: Install Helm
@@ -132,6 +132,8 @@
         update_cache: yes
 
     - name: Install kubernetes python-library
-      ansible.builtin.apt:
-        name: python3-kubernetes
+      ansible.builtin.pip:
+        name: "kubernetes>=24.2.0"
+        executable: pip3
+        extra_args: --break-system-packages
         state: present

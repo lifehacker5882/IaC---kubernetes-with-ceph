@@ -1,5 +1,5 @@
-- name: Initialize kubernetes on control plane
-  hosts: control1
+- name: Initialize kubernetes on control node1
+  hosts: node1
   become: true
   vars:
     pod_network_cidr: "192.168.0.0/16"
@@ -24,7 +24,7 @@
       ansible.builtin.file:
         path: "/home/{{ user }}/.kube"
         state: directory
-        mode: '0755'
+        mode: "0755"
         owner: "{{ user }}"
         group: "{{ user }}"
 
@@ -35,22 +35,22 @@
         remote_src: yes
         owner: "{{ user }}"
         group: "{{ user }}"
-        mode: '0600'
+        mode: "0600"
 
     - name: Show kubeadm init output
       ansible.builtin.debug:
         var: kubeadm_output.stdout_lines
       when: kubeadm_output.stdout is defined
 
-    - name: Generer join-kommando for workers
+    - name: Generate join-commands for workers
       ansible.builtin.shell: kubeadm token create --print-join-command
       register: worker_join_raw
 
-    - name: Generer ny certificate-key for andre controllere
+    - name: Generate new certificate for other controllers
       ansible.builtin.shell: kubeadm init phase upload-certs --upload-certs | tail -n 1
       register: cert_key_raw
 
-    - name: Lagre verdier som facts
+    - name: Save values as facts
       ansible.builtin.set_fact:
         worker_join: "{{ worker_join_raw.stdout }}"
         control_plane_join: "{{ worker_join_raw.stdout }} --control-plane --certificate-key {{ cert_key_raw.stdout }}"

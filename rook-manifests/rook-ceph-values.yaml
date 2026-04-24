@@ -1,0 +1,17 @@
+monitoring:
+  enabled: false
+
+# Required in this setup so the operator can discover block devices and create OSD prepare jobs.
+enableDiscoveryDaemon: true
+
+csi:
+  enableRbdDriver: true
+  enableCephfsDriver: true
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

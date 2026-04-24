@@ -1,6 +1,6 @@
 ---
 - name: Ready workers for ceph
-  hosts: "worker*"
+  hosts: "node*"
   become: true
   tasks:
     - name: Install lvm2

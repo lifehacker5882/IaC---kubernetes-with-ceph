@@ -1,28 +1,38 @@
 ---
 - name: Wait for Kubernetes cluster to be ready
-  hosts: control1
+  hosts: node1
   become: false
 
   tasks:
     - name: Wait for all nodes Ready (strict)
-      shell: kubectl get nodes
+      ansible.builtin.command: kubectl get nodes --no-headers
       register: nodes
+      changed_when: false
+      failed_when: false
       retries: 30
       delay: 10
-      until: nodes.stdout_lines | select('search', 'NotReady') | list | length == 0
+      until:
+        - nodes.rc == 0
+        - (nodes.stdout_lines | length) >= 3
+        - (nodes.stdout_lines | select('search', 'NotReady') | list | length) == 0
 
     - name: Wait for Calico pods to be running
-      shell: kubectl get pods -n calico-system
+      ansible.builtin.command: kubectl get pods -n calico-system
       register: calico
+      changed_when: false
+      failed_when: false
       until: >
+        calico.rc == 0 and
         'calico' in calico.stdout and
         'Running' in calico.stdout
       retries: 30
       delay: 10
 
     - name: Wait for CoreDNS
-      shell: kubectl get pods -n kube-system
+      ansible.builtin.command: kubectl get pods -n kube-system
       register: dns
-      until: "'coredns' in dns.stdout and 'Running' in dns.stdout"
+      changed_when: false
+      failed_when: false
+      until: "dns.rc == 0 and 'coredns' in dns.stdout and 'Running' in dns.stdout"
       retries: 30
       delay: 10
