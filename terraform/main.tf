@@ -14,7 +14,7 @@ provider "openstack" {
 resource "openstack_compute_instance_v2" "kubernetes" {
 	count				= 6
 	name				= var.instance_names[count.index]
-	flavor_name			= "aem.2c2r.50g"
+	flavor_name			= "aem.2c4r.50g"
 	
   image_id = "414d4efa-e67d-43cc-b484-3d88817bcec1"
 

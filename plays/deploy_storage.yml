@@ -23,6 +23,6 @@
       shell: |
         helm upgrade --install rook-ceph-cluster rook-release/rook-ceph-cluster \
         -n rook-ceph --create-namespace \
-        --set cephClusterSpec.cephVersion.image=quay.io/ceph/ceph:v18 \
+        --set cephClusterSpec.cephVersion.image=quay.io/ceph/ceph:v19.2.0 \
         --set cephClusterSpec.storage.useAllNodes=true \
         --set cephClusterSpec.storage.useAllDevices=true
