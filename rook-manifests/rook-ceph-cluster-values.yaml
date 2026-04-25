@@ -15,7 +15,11 @@ cephClusterSpec:
   dashboard:
     enabled: true
 
-  network: {}
+  network:
+    provider: host     # Dette er den magiske linjen
+    addressRanges:     # Valgfritt, men anbefalt for ryddighet
+      public: ["10.196.0.0/16"]  # Subnettet dine noder bor på
+      cluster: ["10.196.0.0/16"]
 
   storage:
     useAllNodes: false
@@ -33,6 +37,34 @@ cephClusterSpec:
         devices:
           - name: sdb
           - name: sdc
+
+  dashboard:
+    enabled: false  # Dette frigjør portene 8443 og 9283 som feilet i loggen din
+
+  resources:
+    mgr:
+      limits:
+        memory: "1Gi"      # Økt fra 512Mi for å unngå OOMKilled
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+    mon:
+      limits:
+        memory: "2Gi"
+      requests:
+        cpu: "100m"
+        memory: "512Mi"
+    osd:
+      limits:
+        memory: "4Gi"      # OSD-er trenger mye RAM under tunge løft
+      requests:
+        cpu: "100m"
+        memory: "512Mi"
+    # Dette sikrer at Ceph-klienten også får plass
+    prepareosd:
+      requests:
+        cpu: "50m"
+        memory: "50Mi"
 
 cephBlockPools:
   - name: replicapool

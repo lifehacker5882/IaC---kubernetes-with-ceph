@@ -38,7 +38,7 @@ resource "openstack_compute_instance_v2" "kubernetes" {
     destination_type		= "local"
     boot_index			= 0
     delete_on_termination	= true
-    volume_size = 35
+    volume_size = 25
   }
 
   # extra disc 1 for all nodes
