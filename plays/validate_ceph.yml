@@ -1,0 +1,53 @@
+---
+- name: Validate Rook Ceph health
+  hosts: node1
+  become: false
+  vars:
+    ceph_cluster_name: "rook-ceph"
+    expected_ceph_health: "HEALTH_OK"
+    allow_health_warn: true
+
+  tasks:
+    - name: Wait for CephCluster resource to exist
+      ansible.builtin.command: kubectl -n rook-ceph get cephcluster {{ ceph_cluster_name }}
+      register: cephcluster_exists
+      changed_when: false
+      failed_when: false
+      retries: 60
+      delay: 10
+      until: cephcluster_exists.rc == 0
+
+    - name: Wait for CephCluster phase Ready
+      ansible.builtin.command: >-
+        kubectl -n rook-ceph get cephcluster {{ ceph_cluster_name }} -o jsonpath={.status.phase}
+      register: ceph_phase
+      changed_when: false
+      failed_when: false
+      retries: 90
+      delay: 10
+      until: ceph_phase.rc == 0 and ceph_phase.stdout == "Ready"
+
+    - name: Read Ceph health value
+      ansible.builtin.command: >-
+        kubectl -n rook-ceph get cephcluster {{ ceph_cluster_name }} -o jsonpath={.status.ceph.health}
+      register: ceph_health
+      changed_when: false
+
+    - name: Validate Ceph health is acceptable
+      ansible.builtin.assert:
+        that:
+          - ceph_health.stdout == expected_ceph_health or (allow_health_warn and ceph_health.stdout == "HEALTH_WARN")
+        fail_msg: "Ceph health is {{ ceph_health.stdout }} (expected {{ expected_ceph_health }} or HEALTH_WARN when allow_health_warn=true)."
+        success_msg: "Ceph health is acceptable: {{ ceph_health.stdout }}"
+
+    - name: Verify rook-ceph-block storageclass exists
+      ansible.builtin.command: kubectl get sc rook-ceph-block
+      register: sc_check
+      changed_when: false
+
+    - name: Show Ceph summary
+      ansible.builtin.debug:
+        msg:
+          - "Ceph phase: {{ ceph_phase.stdout }}"
+          - "Ceph health: {{ ceph_health.stdout }}"
+          - "StorageClass check rc: {{ sc_check.rc }}"

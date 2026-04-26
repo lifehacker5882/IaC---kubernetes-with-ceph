@@ -1,0 +1,76 @@
+---
+- name: Verify Rook-ceph storage
+  hosts: node1
+  vars:
+    test_namespace: default
+  tasks:
+    - name: Install rook ceph toolbox
+      kubernetes.core.k8s:
+        state: present
+        src: https://raw.githubusercontent.com/rook/rook/release-1.20/deploy/examples/toolbox.yaml
+
+    - name: wait for toolbox deployment
+      ansible.builtin.command: kubectl -n rook-ceph rollout status deploy/rook-ceph-tools --timeout=90s
+      changed_when: false
+
+    - name: Create a persistent volume claim and test pod
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          - apiVersion: v1
+            kind: PersistentVolumeClaim
+            metadata:
+              name: ansible-test-pvc
+              namespace: "{{ test_namespace }}"
+            spec:
+              storageClassName: rook-ceph-block
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi
+          - apiVersion: v1
+            kind: Pod
+            metadata:
+              name: ansible-test-pod
+              namespace: "{{ test_namespace }}"
+            spec:
+              containers:
+              - name: web-server
+                image: nginx
+                volumeMounts:
+                - name: mypvc
+                  mountPath: /var/test-data
+              volumes:
+              - name: mypvc
+                persistentVolumeClaim:
+                  claimName: ansible-test-pvc
+
+    - name: Wait for test pod to run
+      ansible.builtin.command: kubectl get pod ansible-test-pod -n {{ test_namespace }} -o jsonpath='{.status.phase}'
+      register: pod_status
+      until: pod_status.stdout == "Running"
+      retries: 20
+      delay: 10
+      changed_when: false
+
+    - name: Get Ceph status from toolbox
+      ansible.builtin.shell: |
+        kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph status
+      register: ceph_health
+      changed_when: false
+
+    - name: Show Ceph health in ansible
+      ansible.builtin.debug:
+        msg: "{{ ceph_health.stdout_lines }}"
+
+    - name: Check if the disk is in use
+      ansible.builtin.shell: |
+        kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph osd tree
+      register: osd_tree
+      changed_when: false
+
+    - name: Vis OSD Tree i Ansible Logg
+      ansible.builtin.debug:
+        msg: "{{ osd_tree.stdout_lines }}"
+

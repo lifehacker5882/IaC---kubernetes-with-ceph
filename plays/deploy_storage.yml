@@ -69,3 +69,36 @@
         helm upgrade --install rook-ceph-cluster rook-release/rook-ceph-cluster \
         -n rook-ceph --create-namespace \
         -f {{ rook_cluster_values_file }}
+
+    - name: Copy test manifest to node1
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../rook-manifests/storage.yaml"
+        dest: "/tmp/test-storage.yaml"
+        mode: '0644'
+
+    - name: remove old StorageClass
+      kubernetes.core.k8s:
+        state: absent
+        definition:
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: rook-ceph-block
+
+    - name: Ensure correct StorageClass is present
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('file', '../rook-manifests/storage-class.yaml') }}"
+
+    - name: Deploy test pod and PVC
+      kubernetes.core.k8s:
+        state: present
+        src: "/tmp/test-storage.yaml"
+
+    - name: Wait for testpod to change to Running
+      ansible.builtin.command: kubectl get pod ceph-test-pod -o jsonpath='{.status.phase}'
+      register: pod_status
+      until: pod_status.stdout == "Running"
+      retries: 15
+      delay: 10
+      changed_when: false
