@@ -15,6 +15,10 @@ cephClusterSpec:
   dashboard:
     enabled: true
 
+  monitoring:
+    enabled: true
+    externalPrometheusMgr: true
+
   network:
     provider: host     # Dette er den magiske linjen
     addressRanges:     # Valgfritt, men anbefalt for ryddighet
@@ -75,14 +79,24 @@ cephBlockPools:
     storageClass:
       enabled: true
       name: rook-ceph-block
+      provisioner: rook-ceph.rbd.csi.ceph.com
       isDefault: false
       reclaimPolicy: Delete
       allowVolumeExpansion: true
       volumeBindingMode: Immediate
       parameters:
+        clusterID: rook-ceph
+        pool: replicapool
         imageFormat: "2"
         imageFeatures: layering
+
         csi.storage.k8s.io/fstype: ext4
+        csi.storage.k8s.io/provisioner-secret-name: rook-csi-rbd-provisioner
+        csi.storage.k8s.io/provisioner-secret-namespace: rook-ceph
+        csi.storage.k8s.io/controller-expand-secret-name: rook-csi-rbd-provisioner
+        csi.storage.k8s.io/controller-expand-secret-namespace: rook-ceph
+        csi.storage.k8s.io/node-stage-secret-name: rook-csi-rbd-node
+        csi.storage.k8s.io/node-stage-secret-namespace: rook-ceph
 
 cephFileSystems: []
 cephObjectStores: []

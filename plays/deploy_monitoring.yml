@@ -1,0 +1,42 @@
+- name: Install Observability
+  hosts: node1
+
+  tasks:
+    - name: Create monitoring namespace
+      kubernetes.core.k8s:
+        name: monitoring
+        kind: Namespace
+        state: present
+
+    - name: Install Prometheus
+      kubernetes.core.helm:
+        name: prometheus
+        chart_ref: prometheus
+        chart_repo_url: "https://prometheus-community.github.io/helm-charts"
+        release_namespace: monitoring
+        values:
+          server:
+            persistentVolume:
+              enabled: true
+              storageClass: "rook-ceph-block"
+              size: "10Gi"
+          alertmanager:
+            persistentVolume:
+              storageClass: "rook-ceph-block"
+              size: "2Gi"
+
+    - name: Install Grafana from OCI register
+      kubernetes.core.helm:
+        name: grafana
+        chart_ref: grafana
+        chart_repo_url: "https://grafana-community.github.io/helm-charts"
+        release_namespace: monitoring
+        values:
+          persistence:
+            enabled: true
+            type: pvc
+            storageClassName: "rook-ceph-block"
+            size: "5Gi"
+          adminPassword: "admin"
+          service:
+            type: NodePort # Nå dashboard uten ingress

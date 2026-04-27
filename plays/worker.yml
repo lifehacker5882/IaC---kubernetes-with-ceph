@@ -9,6 +9,7 @@
         state: present
         update_cache: yes
 
+    # wipes disk if empty, still prints error if Ceph has done its work but skips
     - name: Wipe disks
       ansible.builtin.command: "wipefs -a /dev/{{item}}"
       loop:

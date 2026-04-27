@@ -64,6 +64,16 @@
     - name: Wait for rook-ceph operator to be ready
       shell: kubectl -n rook-ceph rollout status deploy/rook-ceph-operator --timeout=5m
 
+    - name: remove old StorageClass
+      kubernetes.core.k8s:
+        state: absent
+        definition:
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: rook-ceph-block
+          ignore_errors: yes
+
     - name: Install Rook Ceph Cluster
       shell: |
         helm upgrade --install rook-ceph-cluster rook-release/rook-ceph-cluster \
@@ -76,29 +86,22 @@
         dest: "/tmp/test-storage.yaml"
         mode: '0644'
 
-    - name: remove old StorageClass
-      kubernetes.core.k8s:
-        state: absent
-        definition:
-          apiVersion: storage.k8s.io/v1
-          kind: StorageClass
-          metadata:
-            name: rook-ceph-block
 
-    - name: Ensure correct StorageClass is present
-      kubernetes.core.k8s:
-        state: present
-        definition: "{{ lookup('file', '../rook-manifests/storage-class.yaml') }}"
+#    - name: Ensure correct StorageClass is present
+#      kubernetes.core.k8s:
+#        state: present
+#        definition: "{{ lookup('file', '../rook-manifests/storage-class.yaml') }}"
 
     - name: Deploy test pod and PVC
       kubernetes.core.k8s:
         state: present
         src: "/tmp/test-storage.yaml"
 
+    # takes up to 10 minutes to start the pod, long retries to ensure pvc volume exists so it can be bound
     - name: Wait for testpod to change to Running
       ansible.builtin.command: kubectl get pod ceph-test-pod -o jsonpath='{.status.phase}'
       register: pod_status
       until: pod_status.stdout == "Running"
-      retries: 15
-      delay: 10
+      retries: 50
+      delay: 15
       changed_when: false

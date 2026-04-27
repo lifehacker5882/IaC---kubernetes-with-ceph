@@ -1,5 +1,5 @@
 monitoring:
-  enabled: false
+  enabled: true
 
 # Required in this setup so the operator can discover block devices and create OSD prepare jobs.
 enableDiscoveryDaemon: true
