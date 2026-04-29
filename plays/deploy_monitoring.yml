@@ -9,22 +9,32 @@
         state: present
 
     - name: Install Prometheus
-          kubernetes.core.helm:
-            name: prometheus
-            chart_ref: prometheus
-            chart_repo_url: "https://prometheus-community.github.io/helm-charts"
-            release_namespace: monitoring
-            values:
-              server:
-                persistentVolume:
-                  enabled: true
-                  storageClass: "rook-ceph-block"
-                  size: "10Gi"
-              alertmanager:
-                persistentVolume:
-                  enabled: true
-                  storageClass: "rook-ceph-block"
-                  size: "2Gi"
+      kubernetes.core.helm:
+        name: prometheus
+        chart_ref: prometheus
+        chart_repo_url: "https://prometheus-community.github.io/helm-charts"
+        release_namespace: monitoring
+        values:
+          server:
+            persistentVolume:
+              enabled: true
+              storageClass: "rook-ceph-block"
+              size: "10Gi"
+          alertmanager:
+            persistentVolume:
+              enabled: true
+              storageClass: "rook-ceph-block"
+              size: "2Gi"
+
+            config:
+              route:
+                group_by: ['alertname']
+                receiver: 'discord-notifications'
+              receivers:
+              - name: 'discord-notifications'
+                slack_configs: [] # Sikrer at andre default-verdier ikke overstyrer
+                webhook_configs:
+                - url: 'https://discord.com/api/webhooks/1498996054635577366/OnhiPDVDSC-5iCPYdYxZE3wV2fWpNv5bOI17b_b_-9_rKQTxQDMz05IzaGfO23NyaAhi'
 
 
     - name: Install Grafana from OCI register
@@ -42,3 +52,4 @@
           adminPassword: "admin"
           service:
             type: NodePort # Nå dashboard uten ingress
+            nodePort: 32000
