@@ -29,7 +29,7 @@
             #nodeSelector:
             #  kubernetes.io/hostname: node2
 
-            persistene:
+            persistence:
               enabled: true
               storageClass: rook-ceph-block
               size: 2Gi
