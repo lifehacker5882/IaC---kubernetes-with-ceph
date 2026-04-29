@@ -1,1 +1,2 @@
 plays/docker_login.yml
+plays/docker_auth.yml

@@ -23,7 +23,7 @@
           alertmanager:
             persistentVolume:
               enabled: true
-              storageClass: "rook-ceph-block"
+              storageClassName: "rook-ceph-block"
               size: "2Gi"
 
             config:
