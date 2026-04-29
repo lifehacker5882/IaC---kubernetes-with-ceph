@@ -16,15 +16,23 @@
         release_namespace: monitoring
         values:
           server:
+            service:
+              type: NodePort
+              nodePort: 31500
+
             persistentVolume:
               enabled: true
               storageClass: "rook-ceph-block"
               size: "10Gi"
+
           alertmanager:
-            persistentVolume:
+            #nodeSelector:
+            #  kubernetes.io/hostname: node2
+
+            persistene:
               enabled: true
-              storageClassName: "rook-ceph-block"
-              size: "2Gi"
+              storageClass: rook-ceph-block
+              size: 2Gi
 
             config:
               route:

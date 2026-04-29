@@ -1,11 +1,26 @@
-kjør main.yml med ansible-playook for å rulle ut ting
+#kjør main.yml med ansible-playook for å rulle ut ting
 
-for å sjekke health: kubectl -n rook-ceph get cephclusters. Tar ca 8+ minutter før clusters er ferdig med setup
+#for å sjekke health: 
+kubectl -n rook-ceph get cephclusters. Tar ca 8+ minutter før clusters er ferdig med setup
 
-sjekk om disken ble montert
-
+#sjekk om disken ble montert
 kubectl get pvc,pod
 
-se om ceph jobber i bakgrunnen
-
+#se om ceph jobber i bakgrunnen
 kubectl exec ceph-test-pod -- df -h | grep /usr/share/nginx/html
+
+# Hent token med din brukerinfo
+TOKEN=$(curl -s --user 'BRUKERNAVN:PASSORD' "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
+
+# Sjekk status
+curl -i -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest 2>&1 | grep -i ratelimit
+
+# finn garafan pod bruk
+grafana-pod-vm-ip:32000 (fra nodePort deklarert)
+
+#legg til source med prometheus url
+http://prometheus-server.monitoring.svc.cluster.local
+
+# dashboard id
+# node exporter
+1860
