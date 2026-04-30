@@ -24,3 +24,27 @@ http://prometheus-server.monitoring.svc.cluster.local
 # dashboard id
 # node exporter
 1860
+
+# når velero er installert for å sjekke om velero kjører
+kubectl -n velero exec deploy/velero -- /velero version
+kubectl -n velero exec deploy/velero -- /velero backup-location get
+kubectl -n velero exec deploy/velero -- /velero backup get
+
+# verifiser Backupstoragelocation før smoke test
+kubectl get backupstoragelocation -n velero
+kubectl describe backupstoragelocation default -n velero
+kubectl -n velero logs deploy/velero --tail=200
+
+# kjør smoke testen hvis alt gikk gjennom
+kubectl create ns velero-smoke
+kubectl -n velero-smoke create configmap smoke-cm --from-literal=ok=yes
+
+kubectl -n velero exec deploy/velero -- /velero backup create smoke-backup-2 --include-namespaces velero-smoke --wait
+kubectl -n velero exec deploy/velero -- /velero backup describe smoke-backup-2 --details
+kubectl -n velero exec deploy/velero -- /velero backup logs smoke-backup-2
+
+# slett smoke testen
+kubectl delete ns velero-smoke --wait=true
+kubectl -n velero exec deploy/velero -- /velero restore create --from-backup smoke-backup-2 --wait
+kubectl get ns velero-smoke
+kubectl -n velero-smoke get configmap smoke-cm

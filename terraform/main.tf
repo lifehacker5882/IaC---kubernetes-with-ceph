@@ -16,7 +16,7 @@ resource "openstack_compute_instance_v2" "kubernetes" {
   name            = var.instance_names[count.index]
   flavor_name     = "aem.4c8r.50g"
   image_id        = "414d4efa-e67d-43cc-b484-3d88817bcec1"
-  key_pair        = "nahom_master_key"
+  key_pair        = "master"
   security_groups = ["default"]
 
   user_data = <<-EOF
@@ -39,7 +39,7 @@ resource "openstack_compute_instance_v2" "kubernetes" {
     volume_size           = 25
   }
 
-  # Extra disk (Disk 2 - for Ceph/Rook)
+  # Extra disk (Disk 1 - for Ceph/Rook)
   dynamic "block_device" {
     for_each = [1]
     content {
@@ -47,6 +47,18 @@ resource "openstack_compute_instance_v2" "kubernetes" {
       destination_type      = "volume"
       volume_size           = 25
       boot_index            = -1
+      delete_on_termination = true
+    }
+  }
+
+  # Extra disc 2 for all nodes
+  dynamic "block_device" {
+    for_each = [1]
+    content {
+      source_type = "blank"
+      destination_type = "volume"
+      volume_size = 25
+      boot_index  = -1
       delete_on_termination = true
     }
   }

@@ -9,3 +9,4 @@
 - import_playbook: plays/wait_cluster_ready.yml
 - import_playbook: plays/deploy_storage.yml
 - import_playbook: plays/deploy_monitoring.yml
+- import_playbook: plays/velero.yml

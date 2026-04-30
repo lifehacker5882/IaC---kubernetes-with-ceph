@@ -1,0 +1,154 @@
+---
+- name: Deploy Velero Backup System
+  hosts: node1
+  gather_facts: yes
+  tasks:
+    - name: Create velero namespace
+      kubernetes.core.k8s:
+        name: velero
+        api_version: v1
+        kind: Namespace
+        state: present
+
+    - name: Copy Velero credential files
+      copy:
+        src: "{{ playbook_dir}}/../{{ item }}"
+        dest: "/tmp/{{ item }}"
+      with_items:
+        - credentials-velero
+
+    - name: Copy Velero manifest and credential files
+      copy:
+        src: "{{ playbook_dir }}/../velero-backup/{{ item }}"
+        dest: "/tmp/{{ item }}"
+      with_items:
+        - minio-setup.yaml
+
+    - name: Apply MinIO Deployment
+      kubernetes.core.k8s:
+        state: present
+        src: /tmp/minio-setup.yaml
+
+    - name: Wait for MinIO deployment to be available
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: velero
+        name: minio
+      register: minio_deploy
+      until: minio_deploy.resources | length > 0 and minio_deploy.resources[0].status.readyReplicas | default(0) >= 1
+      retries: 30
+      delay: 10
+
+    - name: Wait for MinIO service endpoint
+      kubernetes.core.k8s_info:
+        kind: Service
+        namespace: velero
+        name: minio
+      register: minio_service
+      until: minio_service.resources | length > 0 and minio_service.resources[0].spec.clusterIP is defined
+      retries: 10
+      delay: 5
+
+    - name: Wait 30 seconds for DNS propagation
+      pause:
+        seconds: 30
+
+    - name: Create Velero secret for AWS/MinIO credentials
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: cloud-credentials
+            namespace: velero
+          type: Opaque
+          stringData:
+            cloud: "{{ lookup('file', playbook_dir ~ '/../velero-backup/credentials-velero') }}"
+
+    - name: Add Velero Helm repository
+      kubernetes.core.helm_repository:
+        name: vmware-tanzu
+        repo_url: https://vmware-tanzu.github.io/helm-charts/
+        state: present
+        force_update: true
+
+    - name: Install Velero via Helm chart
+      kubernetes.core.helm:
+        name: velero
+        chart_ref: vmware-tanzu/velero
+        chart_version: "12.0.1"
+        release_namespace: velero
+        create_namespace: true
+        values:
+          upgradeCRDs: false
+          configuration:
+            backupStorageLocation:
+              - name: default
+                provider: aws
+                bucket: velero
+                default: true
+                config:
+                  region: minio
+                  s3ForcePathStyle: "true"
+                  s3Url: http://minio.velero.svc:9000
+            volumeSnapshotLocation:
+              - name: default
+                provider: aws
+          credentials:
+            useSecret: true
+            existingSecret: cloud-credentials
+          deployNodeAgent: true
+          initContainers:
+            - name: velero-plugin-for-aws
+              image: velero/velero-plugin-for-aws:v1.9.0
+              imagePullPolicy: IfNotPresent
+              volumeMounts:
+                - mountPath: /target
+                  name: plugins
+
+    - name: Wait for Velero deployment to be ready
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: velero
+        name: velero
+      register: velero_deploy
+      until: velero_deploy.resources | length > 0 and velero_deploy.resources[0].status.readyReplicas | default(0) >= 1
+      retries: 30
+      delay: 10
+
+    - name: Wait for node-agent DaemonSet to be ready
+      kubernetes.core.k8s_info:
+        kind: DaemonSet
+        namespace: velero
+        name: node-agent
+      register: node_agent
+      until: node_agent.resources | length > 0 and node_agent.resources[0].status.numberReady | default(0) > 0
+      retries: 30
+      delay: 10
+      ignore_errors: yes
+
+    - name: Get Velero backup locations
+      kubernetes.core.k8s_info:
+        kind: BackupStorageLocation
+        namespace: velero
+      register: backup_locations
+      retries: 10
+      delay: 5
+
+    - name: Display Velero setup result
+      debug:
+        msg: |
+          ✓ Velero setup complete via Helm!
+
+          Backup locations configured:
+          {% for loc in backup_locations.resources %}
+            - {{ loc.metadata.name }}: {{ loc.spec.provider }} ({{ loc.spec.objectStorage.bucket }})
+          {% endfor %}
+
+          Next steps:
+          - Test backup: velero backup create test-backup
+          - Check backup: velero backup describe test-backup --details
+          - Monitor: kubectl get all -n velero
+
+          NOTE: MinIO uses emptyDir storage. For production, use PVC with persistent storage.
