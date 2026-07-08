@@ -1,50 +1,80 @@
-#kjør main.yml med ansible-playook for å rulle ut ting
+Infrastructure as Code - Kubernetes with Ceph
+Kort introduksjon
 
-#for å sjekke health: 
-kubectl -n rook-ceph get cephclusters. Tar ca 8+ minutter før clusters er ferdig med setup
+I løpet av dette prosjektet har vi tatt i bruk ulike verktøy; Ansible for orkestrering av infrastrukturen, Terraform for å sette opp ressursene i Openstack, Kubernetes for orkestrering av pods for overvåking, lagring (Ceph) og backup (Velero/minIO). Målet var å opprette et system som er klar for å sette opp i produksjon.
+Hurtig oversikt
+plays/: Ansible-playbooks for å konfigurere noder, installere service og sette opp clusters.
+terraform/: konfigurasjon for å etablere de virtuelle maskinene og output/variables for dynamisk tildeling av ip-adresser.
+rook-manifests/: Rook/Ceph-manifester for distribuert lagring.
+velero-backup/ Verktøy for Velero backup og restore.
+grafana/: Dashboard for overvåkning og logging.
+Forutsetninger
+Lokalt eller fjernmiljø med Linux-servere som fungerer som Kubernetes-noder.
+Ansible installert på kontrollmaskinen.
+Terraform installert for infrastruktur-oppgaver.
+kubectl for å anvende manifest og sjekke klyngestatus.
 
-#sjekk om disken ble montert
-kubectl get pvc,pod
+Arkitekturoverview
 
-#se om ceph jobber i bakgrunnen
-kubectl exec ceph-test-pod -- df -h | grep /usr/share/nginx/html
+![Arkitektur](illustrations/arkitektur.jpg)
 
-# Hent token med din brukerinfo
-TOKEN=$(curl -s --user 'BRUKERNAVN:PASSORD' "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
+Arkitektur-beskrivelse:
+Node 1 styrer Kubernetes med controlplane
+Worker noder kjører applikasjoner og Ceph OSDs (Object Storage Daemons)
+Velero er satt opp til å ta backups med bruk av MinIO
+Prometheus samler metrics som Grafana visualiserer
+Kubernetes tilbyr høy tilgjengelighet ved å replikere applikasjonene på alle noder (1 replikasjon på hver node).
+Hvordan bruke repoet
+Kjør relevante Ansible-playbooks med main.yml eller fra plays/ for å initialisere noder:
 
-# Sjekk status
-curl -i -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest 2>&1 | grep -i ratelimit
+ansible-playbook main.yml
+ansible-playbook -i hosts.ini plays/worker.yml
 
-# finn garafan pod bruk
-grafana-pod-vm-ip:32000 (fra nodePort deklarert)
+Bruk Terraform i terraform/ for å gjøre endringer på infrastruktur:
 
-#legg til source med prometheus url
-http://prometheus-server.monitoring.svc.cluster.local
+cd terraform
+terraform init
+terraform apply
 
-# dashboard id
-# node exporter
-1860
-
-# når velero er installert for å sjekke om velero kjører
-kubectl -n velero exec deploy/velero -- /velero version
-kubectl -n velero exec deploy/velero -- /velero backup-location get
-kubectl -n velero exec deploy/velero -- /velero backup get
-
-# verifiser Backupstoragelocation før smoke test
-kubectl get backupstoragelocation -n velero
-kubectl describe backupstoragelocation default -n velero
-kubectl -n velero logs deploy/velero --tail=200
-
-# kjør smoke testen hvis alt gikk gjennom
-kubectl create ns velero-smoke
-kubectl -n velero-smoke create configmap smoke-cm --from-literal=ok=yes
-
-kubectl -n velero exec deploy/velero -- /velero backup create smoke-backup-2 --include-namespaces velero-smoke --wait
-kubectl -n velero exec deploy/velero -- /velero backup describe smoke-backup-2 --details
-kubectl -n velero exec deploy/velero -- /velero backup logs smoke-backup-2
-
-# slett smoke testen
-kubectl delete ns velero-smoke --wait=true
-kubectl -n velero exec deploy/velero -- /velero restore create --from-backup smoke-backup-2 --wait
-kubectl get ns velero-smoke
-kubectl -n velero-smoke get configmap smoke-cm
+Importer Grafana-dashboardene fra grafana/dashboard.json for overvåkning.
+Rook/Ceph-flow:
+Pod ber om lagring via PersistentVolumeClaim (PVC)
+StorageClass ceph-rbd definerer at dette skal være Ceph RBD-blokk
+Operator oppfatter kallet og opprettet RBD-volum
+Ceph OSDs distribuerer og repliserer data
+Ceph Monitor koordinerer klyngen
+Backup med Velero
+Backup-workflow:
+Velero tar snapshots av Kubernetes-ressurser on demand
+Backups sendes til MinIO (eller S3-kompatibel objektlagring)
+Ved katastrofe: last backup fra MinIO og restaurer alt
+Rook-volumer inkluderes i backupen
+Se velero-backup/ for MinIO-setup og backup-policies.
+Overvåkning med Grafana
+Monitoring-flow:
+Node Exporter samler CPU, memory, disk-metrics
+kube-state-metrics gir kubernetes status
+Prometheus lagrer alle metrics i tidsserie-database
+Grafana leser Prometheus og viser dashboards
+Dashboard-definisjoner finnes i grafana/dashboard.json og kan importeres direkte i Grafana.
+Deployment-flow oversikt
+Deployment-rekkefølge:
+Ansible – installer kjører terraform konfigurasjonene og setter opp Kubernetes og nettverk
+Terraform – opprett infrastruktur (servere/noder)
+Rook Manifests – opprett distribuert lagring
+Velero – sett opp backup-system med MinIO
+Grafana – aktiver overvåkning og dashboards
+Hva vi lærte
+Hvordan man kan konfigurere kubernetes klyngene ved å tildele minne og cpu når ressursene er begrenset for å få klyngen til å fungere.
+Sette opp infrastruktur med deklarativ kode
+Hvordan sette opp blokklagring i Kubernetes med Ceph og samtidig sørge for høy tilgjengelighet
+Hvordan samle metrics og logging for oversikt via Grafana.
+Valg og begrunnelser
+Gitlab for lagring av repository: Gitlab tilbyr en enkelt oppsett av runners som kunne integreres i pipeline for oppsett av infrastrukturen når koden committes til repository. Alternativer: GitHub tilbyr mye av de samme funksjonene som Gitlab.
+Ansible for konfigurasjon: Ansible gir enkel SSH basert automatisering. Alternativer: Puppet som alternativ dersom konfigurasjon for agent-based modell. Tilbyr desired state løsning hvor man definerer hvordan systemet skal konfigureres og puppet sørger for at den ønskede tilstanden opprettholdes.
+Ceph for lagring: Ceph tilbyr en robust, selvhelbredende og skalerbar blokk-, objekt- og fillagring i én og samme løsning. Alternativer: GlusterFS er enklere å sette opp enn Ceph hvis man kun trenger et delt filsystem.
+Velero for backup: God kompabilitet med Ceph. Alternativer: Bacula som er programvare for sikkerhetskopiering og gjenoppretting og tilbyr skalerbar backup og gjenoppretting.
+Videre arbeid og forbedringer
+Automatisere testing av playbooks og Terraform med CI-pipeline før deploy.
+Migrere kodebasen fra custom ansible oppsett til å deploye infrastrukturen med Kubespray for en problemfri oppsett av kubernetes nettverk.
+Vurdere å bruke CICD pipeline for å deploye infrastruktur og holde konfigurasjonen i Gitlab Repository.
