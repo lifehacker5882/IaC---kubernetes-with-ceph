@@ -100,4 +100,6 @@ Deployment-rekkefølge:
 - Automatisere testing av playbooks og Terraform med CI-pipeline før deploy.
 - Migrere kodebasen fra custom ansible oppsett til å deploye infrastrukturen med Kubespray for en problemfri oppsett av kubernetes nettverk.
 - Vurdere å bruke CICD pipeline for å deploye infrastruktur og holde konfigurasjonen i Gitlab Repository.
-
+- Bruk av runners for å opprette tfstate filene i Gitlab med locks for å beskytte mot korrupsjon og race conditions som oppstår når flere kjører koden samtidig
+- Sette opp Bastion, load balancer og ingress regler for å kontrollere trafikk istedet for å ekspondere pods med nodeport
+- Fjerne hardkodet strings i ulike konfigurasjonsfiler under terraform/ og overføre sensitive data over til keyvaults
